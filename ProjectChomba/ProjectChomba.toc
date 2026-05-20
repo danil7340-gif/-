@@ -1,0 +1,12 @@
+## Interface: 70300
+## Title: Project Chomba
+## Notes: Tracks quest chains by chapters and locations.
+## Notes-ruRU: Отслеживание цепочек заданий по главам и локациям.
+## Author: Jules
+## Version: 1.0.0
+## SavedVariables: ProjectChombaDB
+
+Locales\Locale.lua
+Data\Data.lua
+Core.lua
+UI.lua
