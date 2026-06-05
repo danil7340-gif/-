@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
 
 const fl = document.createElement("link");
 fl.rel = "stylesheet";
@@ -204,20 +204,34 @@ export default function AIBlog() {
     setGenStatus(g=>{const n={...g};delete n[id];return n;});
   }
 
-  async function addComment(pid,author,text) {
+  const addComment = useCallback(async (pid,author,text) => {
     const c={id:uid(),author:author.trim(),text:text.trim(),date:new Date().toISOString(),likes:[]};
     const updated={...comments,[pid]:[c,...(comments[pid]||[])]};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);return c;
-  }
-  async function toggleLike(pid,commentId,userId) {
+    setComments(updated);
+    await stSet("aiblog_comments_v1",updated);
+    return c;
+  }, [comments]);
+
+  const toggleLike = useCallback(async (pid,commentId,userId) => {
     const updated={...comments,[pid]:(comments[pid]||[]).map(c=>c.id!==commentId?c:
       {...c,likes:c.likes.includes(userId)?c.likes.filter(x=>x!==userId):[...c.likes,userId]})};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);
-  }
-  async function deleteComment(pid,commentId) {
+    setComments(updated);
+    await stSet("aiblog_comments_v1",updated);
+  }, [comments]);
+
+  const deleteComment = useCallback(async (pid,commentId) => {
     const updated={...comments,[pid]:(comments[pid]||[]).filter(c=>c.id!==commentId)};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);
-  }
+    setComments(updated);
+    await stSet("aiblog_comments_v1",updated);
+  }, [comments]);
+
+  const filtered = useMemo(() => filter==="all"?posts:posts.filter(p=>p.category===filter), [posts, filter]);
+  const usedCats = useMemo(() => [...new Set(posts.map(p=>p.category))], [posts]);
+
+  const handleBack = useCallback(() => setSelectedPost(null), []);
+  const handleAddCommentToSelected = useCallback((a,t) => addComment(selectedPost?.id, a, t), [addComment, selectedPost?.id]);
+  const handleLikeToSelected = useCallback((cId,uid) => toggleLike(selectedPost?.id, cId, uid), [toggleLike, selectedPost?.id]);
+  const handleDeleteToSelected = useCallback((cId) => deleteComment(selectedPost?.id, cId), [deleteComment, selectedPost?.id]);
 
   if(!apiKey) return <KeyScreen input={apiKeyInput} setInput={setApiKeyInput} error={keyError} onSave={async()=>{
     const k=apiKeyInput.trim();
@@ -226,11 +240,9 @@ export default function AIBlog() {
   }}/>;
 
   if(selectedPost) return <PostView post={selectedPost} comments={comments[selectedPost.id]||[]} apiKey={apiKey}
-    onBack={()=>setSelectedPost(null)} onAddComment={(a,t)=>addComment(selectedPost.id,a,t)}
-    onLike={(cId,uid)=>toggleLike(selectedPost.id,cId,uid)} onDelete={(cId)=>deleteComment(selectedPost.id,cId)}/>;
+    onBack={handleBack} onAddComment={handleAddCommentToSelected}
+    onLike={handleLikeToSelected} onDelete={handleDeleteToSelected}/>;
 
-  const filtered=filter==="all"?posts:posts.filter(p=>p.category===filter);
-  const usedCats=[...new Set(posts.map(p=>p.category))];
   const today=new Date().toISOString().split("T")[0];
   const todayPosts=posts.filter(p=>p.date===today);
 
@@ -349,7 +361,7 @@ export default function AIBlog() {
   );
 }
 
-function KeyScreen({input,setInput,error,onSave}) {
+const KeyScreen = memo(function KeyScreen({input,setInput,error,onSave}) {
   return(
     <div style={s.root}><GS/>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:24}}>
@@ -381,9 +393,9 @@ function KeyScreen({input,setInput,error,onSave}) {
       </div>
     </div>
   );
-}
+});
 
-function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
+const PostView = memo(function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
     <div style={s.root}><GS/>
@@ -457,9 +469,9 @@ function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
       </div>
     </div>
   );
-}
+});
 
-function CommentsSection({comments,apiKey,onAdd,onLike,onDelete}) {
+const CommentsSection = memo(function CommentsSection({comments,apiKey,onAdd,onLike,onDelete}) {
   const [author,setAuthor]=useState("");
   const [text,setText]=useState("");
   const [submitting,setSubmitting]=useState(false);
@@ -520,9 +532,9 @@ function CommentsSection({comments,apiKey,onAdd,onLike,onDelete}) {
       }
     </div>
   );
-}
+});
 
-function CommentItem({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIReply,aiReplying}) {
+const CommentItem = memo(function CommentItem({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIReply,aiReplying}) {
   const [hov,setHov]=useState(false);
   return(
     <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
@@ -571,9 +583,9 @@ function CommentItem({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIRep
       </div>
     </div>
   );
-}
+});
 
-function FeaturedPost({post,commentCount,onClick}) {
+const FeaturedPost = memo(function FeaturedPost({post,commentCount,onClick}) {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
     <div className="post-card" onClick={onClick} style={{...s.featured,animationDelay:".1s"}}>
@@ -598,9 +610,9 @@ function FeaturedPost({post,commentCount,onClick}) {
       </div>
     </div>
   );
-}
+});
 
-function PostCard({post,index,commentCount,onClick}) {
+const PostCard = memo(function PostCard({post,index,commentCount,onClick}) {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
     <div className="post-card" onClick={onClick} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
@@ -620,17 +632,17 @@ function PostCard({post,index,commentCount,onClick}) {
       </div>
     </div>
   );
-}
+});
 
-function LoadingState() {
+const LoadingState = memo(function LoadingState() {
   return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
       <div style={{width:40,height:40,border:"2px solid #2a2520",borderTopColor:"#c8b99a",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
       <span style={{fontFamily:"EB Garamond",color:"#555",fontSize:18}}>Загружаю журнал...</span>
     </div>
   );
-}
-function GeneratingHero({slot,status}) {
+});
+const GeneratingHero = memo(function GeneratingHero({slot,status}) {
   return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:500,gap:24}}>
       <div style={{fontSize:72,animation:"pulse2 2s ease-in-out infinite"}}>{SLOT_ICONS[slot??0]}</div>
@@ -640,9 +652,9 @@ function GeneratingHero({slot,status}) {
       </div>
     </div>
   );
-}
+});
 
-function GS() {
+const GS = memo(function GS() {
   return(
     <style>{`
       @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -663,7 +675,7 @@ function GS() {
       ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
     `}</style>
   );
-}
+});
 
 const s={
   root:            {minHeight:"100vh",background:"#0a0906",color:"#f5f0e8"},
