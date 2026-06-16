@@ -1,0 +1,16 @@
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes pulse2{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.post-card{transition:transform .3s,box-shadow .3s;cursor:pointer;animation:fadeUp .5s ease forwards;opacity:0}
+.post-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,.6)!important}
+.cat-btn{transition:all .2s;cursor:pointer;border:none}
+.cat-btn:hover{opacity:.85;transform:translateY(-1px)}
+.img-overlay{transition:opacity .3s}
+.post-card:hover .img-overlay{opacity:.5!important}
+.back-btn:hover{opacity:.7!important;transform:translateX(-3px)!important}
+.action-btn{transition:color .15s}
+.action-btn:hover{color:#c8b99a!important}
+.submit-btn:hover{background:#c8b99a!important;color:#0a0906!important}
+input:focus{outline:none;border-color:#3a3025!important;background:#1a1713!important}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}

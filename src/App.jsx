@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 
 const fl = document.createElement("link");
 fl.rel = "stylesheet";
@@ -77,11 +77,18 @@ export default function AIBlog() {
   const [filter,setFilter]=useState("all");
   const initialized=useRef(false);
   const postsRef=useRef([]);
+  const timerRef=useRef(null);
 
   useEffect(()=>{(async()=>{const k=await stGet("aiblog_gemini_key");if(k)setApiKey(k);})();},[]);
 
   useEffect(()=>{
-    if(apiKey&&!initialized.current){initialized.current=true;loadAndInit(apiKey);}
+    if(apiKey&&!initialized.current){
+      initialized.current=true;
+      loadAndInit(apiKey);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   },[apiKey]);
 
   async function loadAndInit(key) {
@@ -97,14 +104,13 @@ export default function AIBlog() {
     const existIds=new Set(savedPosts.map(p=>p.id));
     const missing=due.filter(s=>!existIds.has(postId(today,s)));
     for(const slot of missing) await generatePost(key,today,slot);
-    const timer=setInterval(async()=>{
+    timerRef.current=setInterval(async()=>{
       const t=new Date().toISOString().split("T")[0];
       const d=getDueSlots();
       const ids=new Set(postsRef.current.map(p=>p.id));
       const miss=d.filter(s=>!ids.has(postId(t,s)));
       for(const slot of miss) await generatePost(key,t,slot);
     },60000);
-    return()=>clearInterval(timer);
   }
 
   async function generatePost(key,today,slot) {
@@ -204,20 +210,32 @@ export default function AIBlog() {
     setGenStatus(g=>{const n={...g};delete n[id];return n;});
   }
 
-  async function addComment(pid,author,text) {
+  const addComment = useCallback(async (pid,author,text) => {
     const c={id:uid(),author:author.trim(),text:text.trim(),date:new Date().toISOString(),likes:[]};
-    const updated={...comments,[pid]:[c,...(comments[pid]||[])]};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);return c;
-  }
-  async function toggleLike(pid,commentId,userId) {
-    const updated={...comments,[pid]:(comments[pid]||[]).map(c=>c.id!==commentId?c:
-      {...c,likes:c.likes.includes(userId)?c.likes.filter(x=>x!==userId):[...c.likes,userId]})};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);
-  }
-  async function deleteComment(pid,commentId) {
-    const updated={...comments,[pid]:(comments[pid]||[]).filter(c=>c.id!==commentId)};
-    setComments(updated);await stSet("aiblog_comments_v1",updated);
-  }
+    setComments(prev => {
+      const updated = {...prev,[pid]:[c,...(prev[pid]||[])]};
+      stSet("aiblog_comments_v1",updated);
+      return updated;
+    });
+    return c;
+  }, []);
+
+  const toggleLike = useCallback(async (pid,commentId,userId) => {
+    setComments(prev => {
+      const updated = {...prev,[pid]:(prev[pid]||[]).map(c=>c.id!==commentId?c:
+        {...c,likes:c.likes.includes(userId)?c.likes.filter(x=>x!==userId):[...c.likes,userId]})};
+      stSet("aiblog_comments_v1",updated);
+      return updated;
+    });
+  }, []);
+
+  const deleteComment = useCallback(async (pid,commentId) => {
+    setComments(prev => {
+      const updated = {...prev,[pid]:(prev[pid]||[]).filter(c=>c.id!==commentId)};
+      stSet("aiblog_comments_v1",updated);
+      return updated;
+    });
+  }, []);
 
   if(!apiKey) return <KeyScreen input={apiKeyInput} setInput={setApiKeyInput} error={keyError} onSave={async()=>{
     const k=apiKeyInput.trim();
@@ -225,17 +243,23 @@ export default function AIBlog() {
     setKeyError("");await stSet("aiblog_gemini_key",k);setApiKey(k);
   }}/>;
 
+  const handleBack = useCallback(()=>setSelectedPost(null),[]);
+  const handleAddComment = useCallback((a,t)=>addComment(selectedPost.id,a,t),[selectedPost?.id,addComment]);
+  const handleLike = useCallback((cId,uid)=>toggleLike(selectedPost.id,cId,uid),[selectedPost?.id,toggleLike]);
+  const handleDelete = useCallback((cId)=>deleteComment(selectedPost.id,cId),[selectedPost?.id,deleteComment]);
+
   if(selectedPost) return <PostView post={selectedPost} comments={comments[selectedPost.id]||[]} apiKey={apiKey}
-    onBack={()=>setSelectedPost(null)} onAddComment={(a,t)=>addComment(selectedPost.id,a,t)}
-    onLike={(cId,uid)=>toggleLike(selectedPost.id,cId,uid)} onDelete={(cId)=>deleteComment(selectedPost.id,cId)}/>;
+    onBack={handleBack} onAddComment={handleAddComment}
+    onLike={handleLike} onDelete={handleDelete}/>;
 
   const filtered=filter==="all"?posts:posts.filter(p=>p.category===filter);
+  const handleSelectPost = useCallback((post)=>setSelectedPost(post), []);
   const usedCats=[...new Set(posts.map(p=>p.category))];
   const today=new Date().toISOString().split("T")[0];
   const todayPosts=posts.filter(p=>p.date===today);
 
   return (
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <header style={s.header}>
         <div style={s.headerInner}>
           <div style={s.logoArea}>
@@ -328,11 +352,11 @@ export default function AIBlog() {
             <p style={{color:"#666",fontFamily:"EB Garamond",fontSize:20}}>Первый пост генерируется...</p></div>
         )}
         {!loading&&posts.length===0&&queue.length>0&&<GeneratingHero slot={queue[0]} status={genStatus[postId(today,queue[0])]}/>}
-        {filtered.length>0&&<FeaturedPost post={filtered[0]} commentCount={(comments[filtered[0].id]||[]).length} onClick={()=>setSelectedPost(filtered[0])}/>}
+        {filtered.length>0&&<FeaturedPost post={filtered[0]} commentCount={(comments[filtered[0].id]||[]).length} onClick={handleSelectPost}/>}
         {filtered.length>1&&(
           <div style={s.grid}>
             {filtered.slice(1).map((p,i)=>(
-              <PostCard key={p.id} post={p} index={i} commentCount={(comments[p.id]||[]).length} onClick={()=>setSelectedPost(p)}/>
+              <PostCard key={p.id} post={p} index={i} commentCount={(comments[p.id]||[]).length} onClick={handleSelectPost}/>
             ))}
           </div>
         )}
@@ -351,7 +375,7 @@ export default function AIBlog() {
 
 function KeyScreen({input,setInput,error,onSave}) {
   return(
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:24}}>
         <div style={{maxWidth:460,width:"100%"}}>
           <div style={{textAlign:"center",marginBottom:44}}>
@@ -386,7 +410,7 @@ function KeyScreen({input,setInput,error,onSave}) {
 function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <div style={{maxWidth:780,margin:"0 auto",padding:"0 24px 80px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"22px 0"}}>
           <button className="back-btn" onClick={onBack}
@@ -522,7 +546,7 @@ function CommentsSection({comments,apiKey,onAdd,onLike,onDelete}) {
   );
 }
 
-function CommentItem({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIReply,aiReplying}) {
+const CommentItem = memo(({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIReply,aiReplying}) => {
   const [hov,setHov]=useState(false);
   return(
     <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
@@ -571,12 +595,12 @@ function CommentItem({comment,index,isAI,liked,likeCount,onLike,onDelete,onAIRep
       </div>
     </div>
   );
-}
+});
 
-function FeaturedPost({post,commentCount,onClick}) {
+const FeaturedPost = memo(({post,commentCount,onClick}) => {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
-    <div className="post-card" onClick={onClick} style={{...s.featured,animationDelay:".1s"}}>
+    <div className="post-card" onClick={()=>onClick(post)} style={{...s.featured,animationDelay:".1s"}}>
       <div style={s.featuredImgWrap}>
         <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} onError={e=>{e.target.style.display="none";}}/>
         <div className="img-overlay" style={s.featuredOverlay}/>
@@ -598,12 +622,12 @@ function FeaturedPost({post,commentCount,onClick}) {
       </div>
     </div>
   );
-}
+});
 
-function PostCard({post,index,commentCount,onClick}) {
+const PostCard = memo(({post,index,commentCount,onClick}) => {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
-    <div className="post-card" onClick={onClick} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
+    <div className="post-card" onClick={()=>onClick(post)} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
       <div style={s.cardImgWrap}>
         <img src={post.imageUrl} alt={post.topic} style={s.cardImg} onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
         <div className="img-overlay" style={s.cardOverlay}/>
@@ -620,7 +644,7 @@ function PostCard({post,index,commentCount,onClick}) {
       </div>
     </div>
   );
-}
+});
 
 function LoadingState() {
   return(
@@ -642,28 +666,6 @@ function GeneratingHero({slot,status}) {
   );
 }
 
-function GS() {
-  return(
-    <style>{`
-      @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-      @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-      @keyframes pulse2{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:1}}
-      @keyframes spin{to{transform:rotate(360deg)}}
-      .post-card{transition:transform .3s,box-shadow .3s;cursor:pointer;animation:fadeUp .5s ease forwards;opacity:0}
-      .post-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,.6)!important}
-      .cat-btn{transition:all .2s;cursor:pointer;border:none}
-      .cat-btn:hover{opacity:.85;transform:translateY(-1px)}
-      .img-overlay{transition:opacity .3s}
-      .post-card:hover .img-overlay{opacity:.5!important}
-      .back-btn:hover{opacity:.7!important;transform:translateX(-3px)!important}
-      .action-btn{transition:color .15s}
-      .action-btn:hover{color:#c8b99a!important}
-      .submit-btn:hover{background:#c8b99a!important;color:#0a0906!important}
-      input:focus{outline:none;border-color:#3a3025!important;background:#1a1713!important}
-      ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
-    `}</style>
-  );
-}
 
 const s={
   root:            {minHeight:"100vh",background:"#0a0906",color:"#f5f0e8"},

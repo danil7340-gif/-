@@ -1,0 +1,3 @@
+## 2025-06-16 - [Fixing async interval leak and render performance]
+**Learning:** React's `useEffect` does not handle cleanup functions returned by `async` functions. If an async initialization function starts an interval, it must be cleared using a stable reference like `useRef`. Additionally, injecting `<style>` tags within component renders causes redundant DOM operations; moving them to a static CSS file is significantly more efficient.
+**Action:** Always use `useRef` for interval IDs started in async effects and prefer static CSS files over dynamic `<style>` tag injection for global styles.
