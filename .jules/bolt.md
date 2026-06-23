@@ -1,0 +1,3 @@
+## 2026-06-23 - Standardizing Vite Structure & Multi-Optimization Performance Boost
+**Learning:** This codebase had several performance bottlenecks (dynamic font/CSS injection, sequential data fetching) and a misaligned project structure (index.html expecting /src/ but files in root). Bundling multiple related optimizations (fonts, CSS, async, images) provides a significant measurable impact on Core Web Vitals (FCP, LCP).
+**Action:** Always verify the project structure against index.html and vite.config.js before optimizing. Standardize to /src/ early if needed. Use Promise.all for independent initial fetches.

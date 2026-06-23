@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const fl = document.createElement("link");
-fl.rel = "stylesheet";
-fl.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap";
-document.head.appendChild(fl);
-
 const SLOTS      = [0, 6, 12, 18];
 const SLOT_NAMES = { 0:"Ночной выпуск", 6:"Утренний выпуск", 12:"Дневной выпуск", 18:"Вечерний выпуск" };
 const SLOT_ICONS = { 0:"🌙", 6:"🌅", 12:"☀️", 18:"🌆" };
@@ -86,8 +81,10 @@ export default function AIBlog() {
 
   async function loadAndInit(key) {
     setLoading(true);
-    const savedPosts=await stGet("aiblog_posts_v3")||[];
-    const savedComments=await stGet("aiblog_comments_v1")||{};
+    const [savedPosts, savedComments] = await Promise.all([
+      stGet("aiblog_posts_v3").then(v => v || []),
+      stGet("aiblog_comments_v1").then(v => v || {})
+    ]);
     postsRef.current=savedPosts;
     setPosts(savedPosts);
     setComments(savedComments);
@@ -235,7 +232,7 @@ export default function AIBlog() {
   const todayPosts=posts.filter(p=>p.date===today);
 
   return (
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <header style={s.header}>
         <div style={s.headerInner}>
           <div style={s.logoArea}>
@@ -351,7 +348,7 @@ export default function AIBlog() {
 
 function KeyScreen({input,setInput,error,onSave}) {
   return(
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:24}}>
         <div style={{maxWidth:460,width:"100%"}}>
           <div style={{textAlign:"center",marginBottom:44}}>
@@ -386,7 +383,7 @@ function KeyScreen({input,setInput,error,onSave}) {
 function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
   const cat=CATEGORIES[post.category]||{label:post.category,color:"#fff"};
   return(
-    <div style={s.root}><GS/>
+    <div style={s.root}>
       <div style={{maxWidth:780,margin:"0 auto",padding:"0 24px 80px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"22px 0"}}>
           <button className="back-btn" onClick={onBack}
@@ -578,7 +575,7 @@ function FeaturedPost({post,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.featured,animationDelay:".1s"}}>
       <div style={s.featuredImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} onError={e=>{e.target.style.display="none";}}/>
+        <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} loading="eager" onError={e=>{e.target.style.display="none";}}/>
         <div className="img-overlay" style={s.featuredOverlay}/>
         <div style={{position:"absolute",top:16,left:16,fontFamily:"Space Mono",fontSize:11,color:"#c8b99a",
           background:"#0a0906bb",border:"1px solid #2a2520",padding:"4px 10px",borderRadius:2}}>
@@ -605,7 +602,7 @@ function PostCard({post,index,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
       <div style={s.cardImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.cardImg} onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
+        <img src={post.imageUrl} alt={post.topic} style={s.cardImg} loading="lazy" onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
         <div className="img-overlay" style={s.cardOverlay}/>
         <span style={{...s.catTag,position:"absolute",top:12,left:12,background:cat.color+"22",color:cat.color,borderColor:cat.color+"44"}}>{cat.label}</span>
         <span style={{position:"absolute",top:12,right:12,fontFamily:"Space Mono",fontSize:10,color:"#c8b99a",background:"#0a0906cc",padding:"3px 8px",borderRadius:2}}>
@@ -642,28 +639,6 @@ function GeneratingHero({slot,status}) {
   );
 }
 
-function GS() {
-  return(
-    <style>{`
-      @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-      @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-      @keyframes pulse2{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:1}}
-      @keyframes spin{to{transform:rotate(360deg)}}
-      .post-card{transition:transform .3s,box-shadow .3s;cursor:pointer;animation:fadeUp .5s ease forwards;opacity:0}
-      .post-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,.6)!important}
-      .cat-btn{transition:all .2s;cursor:pointer;border:none}
-      .cat-btn:hover{opacity:.85;transform:translateY(-1px)}
-      .img-overlay{transition:opacity .3s}
-      .post-card:hover .img-overlay{opacity:.5!important}
-      .back-btn:hover{opacity:.7!important;transform:translateX(-3px)!important}
-      .action-btn{transition:color .15s}
-      .action-btn:hover{color:#c8b99a!important}
-      .submit-btn:hover{background:#c8b99a!important;color:#0a0906!important}
-      input:focus{outline:none;border-color:#3a3025!important;background:#1a1713!important}
-      ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
-    `}</style>
-  );
-}
 
 const s={
   root:            {minHeight:"100vh",background:"#0a0906",color:"#f5f0e8"},
