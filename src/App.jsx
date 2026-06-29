@@ -86,8 +86,15 @@ export default function AIBlog() {
 
   async function loadAndInit(key) {
     setLoading(true);
-    const savedPosts=await stGet("aiblog_posts_v3")||[];
-    const savedComments=await stGet("aiblog_comments_v1")||{};
+    // ⚡ Bolt: Parallelize independent storage fetches to reduce app initialization time.
+    const [savedPostsRaw, savedCommentsRaw] = await Promise.all([
+      stGet("aiblog_posts_v3"),
+      stGet("aiblog_comments_v1")
+    ]);
+
+    const savedPosts = savedPostsRaw || [];
+    const savedComments = savedCommentsRaw || {};
+
     postsRef.current=savedPosts;
     setPosts(savedPosts);
     setComments(savedComments);
@@ -398,7 +405,14 @@ function PostView({post,comments,apiKey,onBack,onAddComment,onLike,onDelete}) {
           </div>
         </div>
         <div style={{borderRadius:4,overflow:"hidden",marginBottom:36,aspectRatio:"16/9",background:"#111"}}>
-          <img src={post.imageUrl} alt={post.topic} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
+          {/* ⚡ Bolt: Prioritize LCP for the main post image in view. */}
+          <img
+            src={post.imageUrl}
+            alt={post.topic}
+            style={{width:"100%",height:"100%",objectFit:"cover"}}
+            fetchpriority="high"
+            onError={e=>{e.target.style.display="none";}}
+          />
         </div>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22,flexWrap:"wrap",animation:"fadeUp .4s ease forwards"}}>
           <span style={{...s.catTag,background:cat.color+"22",color:cat.color,borderColor:cat.color+"44"}}>{cat.label}</span>
@@ -578,7 +592,14 @@ function FeaturedPost({post,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.featured,animationDelay:".1s"}}>
       <div style={s.featuredImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} onError={e=>{e.target.style.display="none";}}/>
+        {/* ⚡ Bolt: Prioritize Largest Contentful Paint (LCP) for the featured image. */}
+        <img
+          src={post.imageUrl}
+          alt={post.topic}
+          style={s.featuredImg}
+          fetchpriority="high"
+          onError={e=>{e.target.style.display="none";}}
+        />
         <div className="img-overlay" style={s.featuredOverlay}/>
         <div style={{position:"absolute",top:16,left:16,fontFamily:"Space Mono",fontSize:11,color:"#c8b99a",
           background:"#0a0906bb",border:"1px solid #2a2520",padding:"4px 10px",borderRadius:2}}>
@@ -605,7 +626,14 @@ function PostCard({post,index,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
       <div style={s.cardImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.cardImg} onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
+        {/* ⚡ Bolt: Use lazy loading for off-screen cards to improve initial load performance. */}
+        <img
+          src={post.imageUrl}
+          alt={post.topic}
+          style={s.cardImg}
+          loading="lazy"
+          onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}
+        />
         <div className="img-overlay" style={s.cardOverlay}/>
         <span style={{...s.catTag,position:"absolute",top:12,left:12,background:cat.color+"22",color:cat.color,borderColor:cat.color+"44"}}>{cat.label}</span>
         <span style={{position:"absolute",top:12,right:12,fontFamily:"Space Mono",fontSize:10,color:"#c8b99a",background:"#0a0906cc",padding:"3px 8px",borderRadius:2}}>
