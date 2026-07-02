@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const fl = document.createElement("link");
-fl.rel = "stylesheet";
-fl.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap";
-document.head.appendChild(fl);
-
 const SLOTS      = [0, 6, 12, 18];
 const SLOT_NAMES = { 0:"Ночной выпуск", 6:"Утренний выпуск", 12:"Дневной выпуск", 18:"Вечерний выпуск" };
 const SLOT_ICONS = { 0:"🌙", 6:"🌅", 12:"☀️", 18:"🌆" };
@@ -86,8 +81,11 @@ export default function AIBlog() {
 
   async function loadAndInit(key) {
     setLoading(true);
-    const savedPosts=await stGet("aiblog_posts_v3")||[];
-    const savedComments=await stGet("aiblog_comments_v1")||{};
+    // Parallelize data fetching to reduce initialization time
+    const [savedPosts, savedComments] = await Promise.all([
+      stGet("aiblog_posts_v3").then(res => res || []),
+      stGet("aiblog_comments_v1").then(res => res || {})
+    ]);
     postsRef.current=savedPosts;
     setPosts(savedPosts);
     setComments(savedComments);
@@ -96,7 +94,10 @@ export default function AIBlog() {
     const due=getDueSlots();
     const existIds=new Set(savedPosts.map(p=>p.id));
     const missing=due.filter(s=>!existIds.has(postId(today,s)));
-    for(const slot of missing) await generatePost(key,today,slot);
+    // Parallelize initial missing post generations to speed up first load
+    if (missing.length > 0) {
+      await Promise.all(missing.map(slot => generatePost(key, today, slot)));
+    }
     const timer=setInterval(async()=>{
       const t=new Date().toISOString().split("T")[0];
       const d=getDueSlots();
