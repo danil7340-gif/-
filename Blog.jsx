@@ -86,22 +86,34 @@ export default function AIBlog() {
 
   async function loadAndInit(key) {
     setLoading(true);
-    const savedPosts=await stGet("aiblog_posts_v3")||[];
-    const savedComments=await stGet("aiblog_comments_v1")||{};
+    // ⚡ Bolt: Parallelize initial storage fetch to reduce blocked time
+    const [savedPostsRaw, savedCommentsRaw] = await Promise.all([
+      stGet("aiblog_posts_v3"),
+      stGet("aiblog_comments_v1")
+    ]);
+    const savedPosts = savedPostsRaw || [];
+    const savedComments = savedCommentsRaw || {};
+
     postsRef.current=savedPosts;
     setPosts(savedPosts);
     setComments(savedComments);
     setLoading(false);
+
     const today=new Date().toISOString().split("T")[0];
     const due=getDueSlots();
     const existIds=new Set(savedPosts.map(p=>p.id));
     const missing=due.filter(s=>!existIds.has(postId(today,s)));
+
+    // ⚡ Bolt: Reverted parallel generation to avoid storage race conditions
+    // Posts are stored as a single collection, so sequential generation is safer
     for(const slot of missing) await generatePost(key,today,slot);
+
     const timer=setInterval(async()=>{
       const t=new Date().toISOString().split("T")[0];
       const d=getDueSlots();
       const ids=new Set(postsRef.current.map(p=>p.id));
       const miss=d.filter(s=>!ids.has(postId(t,s)));
+
       for(const slot of miss) await generatePost(key,t,slot);
     },60000);
     return()=>clearInterval(timer);
@@ -578,7 +590,8 @@ function FeaturedPost({post,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.featured,animationDelay:".1s"}}>
       <div style={s.featuredImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} onError={e=>{e.target.style.display="none";}}/>
+        {/* ⚡ Bolt: Use fetchpriority="high" for the LCP image to prioritize its loading */}
+        <img src={post.imageUrl} alt={post.topic} style={s.featuredImg} fetchpriority="high" onError={e=>{e.target.style.display="none";}}/>
         <div className="img-overlay" style={s.featuredOverlay}/>
         <div style={{position:"absolute",top:16,left:16,fontFamily:"Space Mono",fontSize:11,color:"#c8b99a",
           background:"#0a0906bb",border:"1px solid #2a2520",padding:"4px 10px",borderRadius:2}}>
@@ -605,7 +618,8 @@ function PostCard({post,index,commentCount,onClick}) {
   return(
     <div className="post-card" onClick={onClick} style={{...s.card,animationDelay:`${.15+index*.07}s`}}>
       <div style={s.cardImgWrap}>
-        <img src={post.imageUrl} alt={post.topic} style={s.cardImg} onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
+        {/* ⚡ Bolt: Add loading="lazy" for off-screen images to improve initial load speed */}
+        <img src={post.imageUrl} alt={post.topic} style={s.cardImg} loading="lazy" onError={e=>{e.target.style.display="none";e.target.parentElement.style.background="#111";}}/>
         <div className="img-overlay" style={s.cardOverlay}/>
         <span style={{...s.catTag,position:"absolute",top:12,left:12,background:cat.color+"22",color:cat.color,borderColor:cat.color+"44"}}>{cat.label}</span>
         <span style={{position:"absolute",top:12,right:12,fontFamily:"Space Mono",fontSize:10,color:"#c8b99a",background:"#0a0906cc",padding:"3px 8px",borderRadius:2}}>
