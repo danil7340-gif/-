@@ -1,0 +1,3 @@
+## 2026-07-06 - Google Font Loading Optimization
+**Learning:** Moving Google Font loading from dynamic JavaScript injection to static `<link>` tags in `index.html` significantly improves performance. It allows the browser to discover the font dependencies earlier in the network waterfall, improving First Contentful Paint (FCP) and reducing Cumulative Layout Shift (CLS). Adding `preconnect` hints for `fonts.googleapis.com` and `fonts.gstatic.com` further reduces latency by pre-establishing connections.
+**Action:** Always prefer static resource declarations in `index.html` over dynamic injection in JavaScript for critical assets like fonts and styles. Use `preconnect` and `dns-prefetch` for external resource domains.
