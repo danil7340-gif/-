@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const fl = document.createElement("link");
-fl.rel = "stylesheet";
-fl.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap";
-document.head.appendChild(fl);
-
 const SLOTS      = [0, 6, 12, 18];
 const SLOT_NAMES = { 0:"Ночной выпуск", 6:"Утренний выпуск", 12:"Дневной выпуск", 18:"Вечерний выпуск" };
 const SLOT_ICONS = { 0:"🌙", 6:"🌅", 12:"☀️", 18:"🌆" };
