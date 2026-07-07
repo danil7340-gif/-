@@ -86,8 +86,14 @@ export default function AIBlog() {
 
   async function loadAndInit(key) {
     setLoading(true);
-    const savedPosts=await stGet("aiblog_posts_v3")||[];
-    const savedComments=await stGet("aiblog_comments_v1")||{};
+    // ⚡ Bolt: Parallelize independent storage fetches to reduce initialization time
+    const [savedPostsRaw, savedCommentsRaw] = await Promise.all([
+      stGet("aiblog_posts_v3"),
+      stGet("aiblog_comments_v1")
+    ]);
+    const savedPosts = savedPostsRaw || [];
+    const savedComments = savedCommentsRaw || {};
+
     postsRef.current=savedPosts;
     setPosts(savedPosts);
     setComments(savedComments);
